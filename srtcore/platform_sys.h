@@ -8,7 +8,7 @@
    #include <windows.h>
    #include <inttypes.h>
    #include <stdint.h>
-   #include <win/wintime.h>
+   #include "win/wintime.h"
    #if defined(_MSC_VER)
       #pragma warning(disable:4251)
    #endif
@@ -16,6 +16,7 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <sys/time.h>
+#include <netdb.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <unistd.h>

@@ -26,7 +26,7 @@ set (CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/scripts")
 include(haiUtil)
 include(FindPkgConfig)
 
-set (SRT_VERSION 1.2.0)
+set (SRT_VERSION 1.2.2)
 set_version_variables(SRT_VERSION ${SRT_VERSION})
 
 if (NOT DEFINED ENABLE_DEBUG)
@@ -89,7 +89,14 @@ set_if(LINUX ${CMAKE_SYSTEM_NAME} MATCHES "Linux")
 
 # find OpenSSL
 if ( USE_GNUTLS )
-	pkg_check_modules (SSL REQUIRED gnutls nettle)
+	set (SSL_REQUIRED_MODULES "gnutls nettle")
+	if (WIN32)
+		if (MINGW)
+			set (SSL_REQUIRED_MODULES "${SSL_REQUIRED_MODULES} zlib")
+		endif()
+	endif()
+ 
+	pkg_check_modules (SSL REQUIRED ${SSL_REQUIRED_MODULES})
 
 	add_definitions(
 		-DUSE_GNUTLS=1
@@ -99,6 +106,7 @@ if ( USE_GNUTLS )
 		${SSL_LIBRARY_DIRS}
 	)
 else()
+	set (SSL_REQUIRED_MODULES "openssl libcrypto zlib")
 	find_package(OpenSSL REQUIRED)
 	set (SSL_INCLUDE_DIRS ${OPENSSL_INCLUDE_DIR})
 	set (SSL_LIBRARIES ${OPENSSL_LIBRARIES})
@@ -108,7 +116,6 @@ else()
 		-DHAICRYPT_USE_OPENSSL_AES
 	)
 endif()
-
 message (STATUS "SSL libraries: ${SSL_LIBRARIES}")
 
 # Detect if the compiler is GNU compatable for flags
@@ -211,6 +218,7 @@ if (${ENABLE_PROFILE} AND HAVE_COMPILER_GNU_COMPAT)
 endif()
 
 
+if (NOT MINGW)
 # find pthread
 find_path(PTHREAD_INCLUDE_DIR pthread.h HINTS C:/pthread-win32/include)
 if (PTHREAD_INCLUDE_DIR)
@@ -225,6 +233,10 @@ if (PTHREAD_LIBRARY)
 else()
 	message(FATAL_ERROR "Failed to find pthread library. Specify PTHREAD_LIBRARY.")
 endif()
+
+else()
+find_library(PTHREAD_LIBRARY NAMES pthread pthreadGC2 pthreadGC)
+endif() # if (NOT MINGW)
 
 # This is required in some projects that add some other sources
 # to the SRT library to be compiled together (aka "virtual library").
@@ -357,9 +369,9 @@ target_include_directories(${TARGET_haicrypt}
 )
 
 set_target_properties (${TARGET_haicrypt} PROPERTIES VERSION ${SRT_VERSION} SOVERSION ${SRT_VERSION_MAJOR})
-target_link_libraries(${TARGET_haicrypt} PRIVATE ${SSL_LIBRARIES})
-set (SRT_LIBS_PRIVATE ${SSL_LIBRARIES})
-if (WIN32)
+target_link_libraries(${TARGET_haicrypt} PRIVATE ${SRT_LIBS_PRIVATE} ${SSL_LIBRARIES})
+
+if ( WIN32 AND NOT CYGWIN )
 	target_link_libraries(${TARGET_haicrypt} PRIVATE ws2_32.lib)
 	set (SRT_LIBS_PRIVATE ${SRT_LIBS_PRIVATE} ws2_32.lib)
 endif()
@@ -385,10 +397,8 @@ if (ENABLE_SHARED)
 	target_compile_definitions(${TARGET_srt} PUBLIC -DUDT_DYNAMIC) 
 endif()
 
-if ( WIN32 )
-	if (NOT CYGWIN)
+if ( WIN32 AND (NOT MINGW AND NOT CYGWIN) )
     	target_link_libraries(${TARGET_srt} PUBLIC Ws2_32.lib)
-	endif()
 endif()
 
 install(TARGETS ${TARGET_srt}
@@ -452,6 +462,9 @@ endif()
 
 if ( ENABLE_CXX11 )
 
+# FIXME: with MINGW, it fails to build stransmit
+# https://github.com/Haivision/srt/issues/177
+if ( NOT MINGW )
 	add_executable(stransmit
 		${CMAKE_SOURCE_DIR}/apps/stransmit.cpp
 		${CMAKE_SOURCE_DIR}/common/uriparser.cpp
@@ -467,6 +480,8 @@ if ( ENABLE_CXX11 )
 	target_link_libraries(utility-test ${TARGET_srt})
 	install(TARGETS stransmit RUNTIME DESTINATION bin)
 	install(PROGRAMS scripts/sfplay DESTINATION bin)
+
+endif() # if ( NOT MINGW )
 
 endif()
 
