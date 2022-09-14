@@ -780,16 +780,6 @@ void CUDTGroup::getOpt(SRT_SOCKOPT optname, void* pw_optval, int& w_optlen)
     return ps->core().getOpt(optname, (pw_optval), (w_optlen));
 }
 
-struct HaveState : public unary_function<pair<SRTSOCKET, SRT_SOCKSTATUS>, bool>
-{
-    SRT_SOCKSTATUS s;
-    HaveState(SRT_SOCKSTATUS ss)
-        : s(ss)
-    {
-    }
-    bool operator()(pair<SRTSOCKET, SRT_SOCKSTATUS> i) const { return i.second == s; }
-};
-
 SRT_SOCKSTATUS CUDTGroup::getStatus()
 {
     typedef vector<pair<SRTSOCKET, SRT_SOCKSTATUS> > states_t;
@@ -979,7 +969,7 @@ void CUDTGroup::close()
     // XXX This looks like a dead code. Group receiver functions
     // do not use any lock on m_RcvDataLock, it is likely a remainder
     // of the old, internal impementation. 
-    // CSync::lock_signal(m_RcvDataCond, m_RcvDataLock);
+    // CSync::lock_notify_one(m_RcvDataCond, m_RcvDataLock);
 }
 
 // [[using locked(m_Global->m_GlobControlLock)]]
